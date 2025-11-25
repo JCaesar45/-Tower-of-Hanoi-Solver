@@ -1,0 +1,294 @@
+/* app.js
+   Tower of Hanoi visual solver — compact, testable, and interview-ready.
+   - Exposes hanoi_solver(n) which returns a string: each line is a state like "[3, 2, 1] [] []"
+   - Animates states into DOM
+   - Supports step, play/pause, speed control, export and copy
+*/
+
+// ---------- Utilities ----------
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+/* DOM elements */
+const rodsDOM = () => $$(".rod");
+const stage = $("#stage");
+const nInput = $("#nInput");
+const speedRange = $("#speedRange");
+const speedLabel = $("#speedLabel");
+const generateBtn = $("#generate");
+const solveBtn = $("#solve");
+const stepBackBtn = $("#stepBack");
+const stepForwardBtn = $("#stepForward");
+const pausePlayBtn = $("#pausePlay");
+const resetBtn = $("#reset");
+const logArea = $("#log");
+const moveCounter = $("#moveCounter");
+const totalMovesSpan = $("#totalMoves");
+const copyLogBtn = $("#copyLog");
+const downloadLogBtn = $("#downloadLog");
+const exportTxtBtn = $("#exportTxt");
+const testSolverBtn = $("#testSolver");
+const showArraysBtn = $("#showArrays");
+
+/* State */
+let n = parseInt(nInput.value, 10) || 4;
+let rods = [[], [], []];             // arrays of disks (bottom..top represented as last element is top)
+let states = [];                     // array of string states "[..] [..] [..]"
+let moves = [];                      // list of actual moves as [from, to]
+let currentStep = 0;                 // index into states
+let playInterval = null;
+let animationDelay = parseInt(speedRange.value, 10);
+
+/* Helper: record textual state like "[3, 2, 1] [] []" */
+function formatState(rods) {
+  // represent each rod as list with largest first (as in problem), which is same order in our rods arrays
+  const arrs = rods.map(r => `[${r.join(", ")}]`);
+  return `${arrs[0]} ${arrs[1]} ${arrs[2]}`;
+}
+
+/* The testable solver: returns string with states each on newline */
+function hanoi_solver(N) {
+  const localRods = [Array.from({length: N}, (_, i) => N - i), [], []];
+  const out = [];
+  function record() { out.push(formatState(localRods)); }
+  function move(i, j) {
+    const disk = localRods[i].pop();
+    localRods[j].push(disk);
+    record();
+  }
+  function solve(k, start, aux, end) {
+    if (k === 0) return;
+    solve(k - 1, start, end, aux);
+    move(start, end);
+    solve(k - 1, aux, start, end);
+  }
+  record();
+  solve(N, 0, 1, 2);
+  return out.join("\n");
+}
+
+/* Build internal moves & states for UI animation */
+function buildSolution(N) {
+  rods = [Array.from({length: N}, (_, i) => N - i), [], []];
+  states = [];
+  moves = [];
+  function record() { states.push(formatState(rods)); }
+  function move(i, j) {
+    const disk = rods[i].pop();
+    rods[j].push(disk);
+    moves.push([i, j, disk]); // store disk for debug
+    record();
+  }
+  function solve(k, start, aux, end) {
+    if (k === 0) return;
+    solve(k - 1, start, end, aux);
+    move(start, end);
+    solve(k - 1, aux, start, end);
+  }
+  record();
+  solve(N, 0, 1, 2);
+  return { states, moves };
+}
+
+/* Render the current rods visually; disks are divs with width based on size */
+function renderRodsFromState(stateIndex) {
+  // parse textual state in states[stateIndex] into arrays
+  if (!states.length) return;
+  const state = states[stateIndex];
+  const rodStrings = state.match(/\[[^\]]*\]/g) || ["[]", "[]", "[]"];
+  const parsed = rodStrings.map(s => {
+    const inner = s.slice(1, -1).trim();
+    return inner.length ? inner.split(/\s*,\s*/).map(Number) : [];
+  });
+
+  // Clear rods
+  rodsDOM().forEach(r => r.innerHTML = "");
+
+  parsed.forEach((arr, rodIndex) => {
+    // we'll render from bottom to top; arr is in descending order [N,...,1]
+    arr.forEach((diskSize, idx) => {
+      const disk = document.createElement("div");
+      disk.className = "disk";
+      disk.dataset.size = diskSize;
+      disk.textContent = diskSize;
+      // width scaled: smallest ~28% to largest ~95% of rod width
+      const minW = 28;
+      const maxW = 95;
+      const maxDisk = parseInt(nInput.max || "10", 10);
+      const sizePercent = minW + (diskSize - 1) * ((maxW - minW) / Math.max(1, maxDisk - 1));
+      disk.style.width = `${sizePercent}%`;
+      disk.style.marginLeft = "auto";
+      disk.style.marginRight = "auto";
+      // invert order so lower disks appear below
+      disk.style.order = idx;
+      rodsDOM()[rodIndex].appendChild(disk);
+    });
+  });
+
+  moveCounter.textContent = stateIndex;
+}
+
+/* Playback controls */
+function stopPlayback() {
+  if (playInterval) {
+    clearInterval(playInterval);
+    playInterval = null;
+    pausePlayBtn.textContent = "Play";
+  }
+}
+function startPlayback() {
+  stopPlayback();
+  pausePlayBtn.textContent = "Pause";
+  const total = states.length - 1;
+  playInterval = setInterval(() => {
+    if (currentStep < total) {
+      currentStep++;
+      renderRodsFromState(currentStep);
+      logArea.scrollTop = logArea.scrollHeight;
+    } else {
+      stopPlayback();
+    }
+  }, animationDelay);
+}
+
+/* UI Wiring */
+function setSpeed(ms) {
+  animationDelay = ms;
+  speedLabel.textContent = `${ms}ms`;
+  if (playInterval) {
+    startPlayback(); // restart with new speed
+  }
+}
+
+/* Generate / Solve / Render initial */
+function generate() {
+  n = Math.min(10, Math.max(1, parseInt(nInput.value, 10) || 4));
+  const built = buildSolution(n);
+  // states is array of state strings
+  // show in log
+  logArea.value = built.states.join("\n");
+  totalMovesSpan.textContent = Math.max(0, built.states.length - 1);
+  currentStep = 0;
+  renderRodsFromState(0);
+}
+
+/* Solve & play */
+function solveAndPlay() {
+  // ensure generated
+  generate();
+  // start playing
+  stopPlayback();
+  setSpeed(parseInt(speedRange.value, 10));
+  startPlayback();
+}
+
+/* Step forward/back */
+function stepForward() {
+  const last = states.length - 1;
+  if (currentStep < last) {
+    currentStep++;
+    renderRodsFromState(currentStep);
+  }
+}
+function stepBack() {
+  if (currentStep > 0) {
+    currentStep--;
+    renderRodsFromState(currentStep);
+  }
+}
+
+/* Reset to initial */
+function resetStage() {
+  stopPlayback();
+  currentStep = 0;
+  renderRodsFromState(0);
+}
+
+/* Copy or download log */
+async function copyLog() {
+  try {
+    await navigator.clipboard.writeText(logArea.value);
+    copyLogBtn.textContent = "Copied!";
+    setTimeout(() => (copyLogBtn.textContent = "Copy Log"), 1200);
+  } catch (e) {
+    alert("Copy failed. Select and copy manually.");
+  }
+}
+function downloadLog() {
+  const blob = new Blob([logArea.value], {type: "text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `hanoi_${n}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* Export states as file (button) */
+function exportTxt() {
+  downloadLog();
+}
+
+/* Test: run the textual solver and show alert with sample */
+function runTestSolver() {
+  const sample = hanoi_solver(n);
+  alert(`hanoi_solver(${n}) returned ${sample.split("\n").length} lines (moves+start). Check log area for full output.`);
+}
+
+/* Show arrays (compact) - toggles a compact representation in the log */
+function toggleShowArrays() {
+  if (showArraysBtn.dataset.mode === "arrays") {
+    // already arrays: show raw states
+    logArea.value = states.join("\n");
+    showArraysBtn.dataset.mode = "";
+    showArraysBtn.textContent = "Show arrays (compact)";
+  } else {
+    // show compact "moves" lines from states (like the test expects full states)
+    // just ensure logArea has states
+    logArea.value = states.join("\n");
+    showArraysBtn.dataset.mode = "arrays";
+    showArraysBtn.textContent = "Hide arrays";
+  }
+}
+
+/* Initialization wiring */
+function init() {
+  // Wire events
+  generateBtn.addEventListener("click", generate);
+  $("#generateBtn")?.addEventListener("click", generate); // compact control in topbar (if present)
+  solveBtn.addEventListener("click", solveAndPlay);
+  stepForwardBtn.addEventListener("click", stepForward);
+  stepBackBtn.addEventListener("click", stepBack);
+  pausePlayBtn.addEventListener("click", () => {
+    if (playInterval) stopPlayback();
+    else startPlayback();
+  });
+  resetBtn.addEventListener("click", resetStage);
+  speedRange.addEventListener("input", (e) => setSpeed(parseInt(e.target.value, 10)));
+  copyLogBtn.addEventListener("click", copyLog);
+  downloadLogBtn.addEventListener("click", downloadLog);
+  exportTxtBtn.addEventListener("click", exportTxt);
+  testSolverBtn.addEventListener("click", runTestSolver);
+  showArraysBtn.addEventListener("click", toggleShowArrays);
+
+  // keyboard shortcuts (left/right for stepping)
+  window.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowRight") stepForward();
+    if (ev.key === "ArrowLeft") stepBack();
+    if (ev.key === " ") { ev.preventDefault(); if (playInterval) stopPlayback(); else startPlayback(); }
+  });
+
+  // default generate
+  generate();
+
+  // update speed label
+  setSpeed(parseInt(speedRange.value, 10));
+}
+
+/* Start */
+document.addEventListener("DOMContentLoaded", init);
+
+/* Expose solver globally so testers / interviewers can call it from console */
+window.hanoi_solver = hanoi_solver;
