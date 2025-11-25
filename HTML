@@ -1,0 +1,92 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tower of Hanoi — Visual Solver</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden><path d="M12 2L2 7v13h20V7L12 2z"/></svg>
+      <div>
+        <h1>Tower of Hanoi — Visual Solver</h1>
+        <p class="subtitle">Recursive algorithm, animated. Perfect for portfolio demos.</p>
+      </div>
+    </div>
+
+    <div class="controls-compact" aria-hidden>
+      <label for="diskCount">Disks</label>
+      <input id="diskCount" type="number" min="1" max="10" value="4" />
+      <button id="generateBtn" class="btn primary">Generate</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="left-panel">
+      <div class="stage" id="stage" aria-live="polite" aria-label="Tower of Hanoi stage">
+        <!-- rods and disks render here -->
+        <div class="rod" data-rod="0" aria-label="Source rod"></div>
+        <div class="rod" data-rod="1" aria-label="Auxiliary rod"></div>
+        <div class="rod" data-rod="2" aria-label="Target rod"></div>
+      </div>
+
+      <div class="controls">
+        <div class="control-row">
+          <label for="nInput">Number of disks</label>
+          <input id="nInput" type="number" min="1" max="10" value="4" />
+        </div>
+
+        <div class="control-row">
+          <label for="speedRange">Animation speed</label>
+          <input id="speedRange" type="range" min="100" max="2000" value="600" />
+          <span id="speedLabel">600ms</span>
+        </div>
+
+        <div class="btn-row">
+          <button id="generate" class="btn">Generate</button>
+          <button id="solve" class="btn primary">Solve & Play</button>
+          <button id="stepBack" class="btn" title="Step back">⟲ Step</button>
+          <button id="stepForward" class="btn" title="Step forward">Step ⟳</button>
+          <button id="pausePlay" class="btn" title="Pause / Play">Pause</button>
+          <button id="reset" class="btn danger">Reset</button>
+        </div>
+
+        <div class="info-row">
+          <div>Moves: <span id="moveCounter">0</span></div>
+          <div>Total moves: <span id="totalMoves">0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="right-panel" aria-label="Move log and output">
+      <div class="card">
+        <h2>Move Log (states)</h2>
+        <textarea id="log" readonly rows="12" aria-label="Move log"></textarea>
+        <div class="card-actions">
+          <button id="copyLog" class="btn">Copy Log</button>
+          <button id="downloadLog" class="btn">Download</button>
+          <button id="showArrays" class="btn">Show arrays (compact)</button>
+        </div>
+      </div>
+
+      <div class="card small">
+        <h3>Export / Test</h3>
+        <button id="exportTxt" class="btn">Export states as .txt</button>
+        <button id="testSolver" class="btn">Run hanoi_solver(n)</button>
+      </div>
+
+      <div class="card small">
+        <h3>About</h3>
+        <p>Includes a testable <code>hanoi_solver(n)</code> that returns the textual state log (one state per line) — ideal for unit tests and interview demonstrations.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <small>Built for portfolio & interviews — clean UI, solid algorithm, and animation.</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
